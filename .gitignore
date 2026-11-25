@@ -1,0 +1,16 @@
+# Environment and caches
+.venv/
+__pycache__/
+*.pyc
+
+# Local tool settings
+.claude/
+
+# Trained models: 518 MB each, rebuilt by src/day2_finetune_arabert.py
+model/
+
+# Datasets: downloaded and rebuilt by src/day1_arabic_sentiment.py.
+# Several sources state no license, so they are not redistributed here.
+data/*
+!data/neutral_probe.csv
+!data/sentences_30.csv
