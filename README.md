@@ -161,6 +161,10 @@ Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - GPU is used automatically if available (`torch.cuda.is_available()`). The local `.venv` has the CUDA build: run `.venv/Scripts/python src/day2_finetune_arabert.py`.
 - Set `MODEL_DIR` to serve a model from another folder.
 
+## License
+
+The code is under the [MIT License](LICENSE). It does not cover the datasets or the base model, which keep their own terms; several of them state no license.
+
 ---
 
 # تحليل المشاعر العربية
