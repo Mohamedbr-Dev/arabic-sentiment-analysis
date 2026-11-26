@@ -14,3 +14,4 @@ model/
 data/*
 !data/neutral_probe.csv
 !data/sentences_30.csv
+build/

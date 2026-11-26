@@ -2,6 +2,8 @@
 
 Fine-tuned **AraBERT** (aubmindlab/bert-base-arabertv02-twitter) for 3-class Arabic sentiment classification (positive / neutral / negative), served via **FastAPI**.
 
+**Live demo:** https://medtn12-arabic-sentiment-analysis.static.hf.space (the model runs in your browser; first load downloads about 130 MB).
+
 This repository holds the code, the tests and the two hand-written test files. The datasets and the trained models (518 MB each) are not included: step 1 below downloads the data, and step 2 trains the model.
 
 ---
@@ -149,8 +151,25 @@ curl -X POST http://localhost:8000/predict \
 - `uncertain`: confidence is below 0.6. On the validation set such answers were right 58% of the time.
 - `truncated`: the text was longer than 64 tokens, and the model read only the start.
 - Status 422: over 2000 characters, or no Arabic letters or emoji besides links and mentions.
+- Status 429: too many requests. Off by default; set `RATE_LIMIT_PER_CLIENT` and `RATE_LIMIT_TOTAL` (requests per minute) when the server is public. Behind a proxy the client is the last `X-Forwarded-For` entry.
 
 Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### 5. Live demo in the browser
+
+The public demo is a static page: [transformers.js](https://github.com/huggingface/transformers.js) runs an 8-bit ONNX copy of the model in the visitor's browser, so there is no server to pay for and texts never leave the device.
+
+```bash
+pip install onnx onnxruntime
+python deploy/export_onnx.py model/arabert_sentiment build/static-space/model   # export, then score
+python deploy/make_fixtures.py build/static-space/model build/static-space/fixtures.json
+cp deploy/static/* build/static-space/
+python -m http.server 8001 --directory build/static-space   # open /check.html
+```
+
+`deploy/static/text_clean.js` is the browser twin of `src/text_clean.py`; `check.html` compares the two cleanings, the two tokenizers and both models on the test texts. Last check: cleaning 5,427/5,427 and tokens 1,085/1,085 identical, 135/135 sample labels identical, tweet accuracy 0.868 in the browser against 0.871 for the PyTorch model. Per-channel weights matter: the default 8-bit export fell to 0.822 on validation data, per-channel kept 0.881 (0.884 unquantized).
+
+Upload `README.md`, `index.html`, `model.js`, `text_clean.js` and `model/` to a static Hugging Face Space. Keep `fixtures.json` out: it holds dataset texts. `deploy/Dockerfile` and `deploy/build_space.py` serve the FastAPI version instead, on hosts that run containers (Hugging Face now charges for Docker Spaces).
 
 ---
 

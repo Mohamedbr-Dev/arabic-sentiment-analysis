@@ -180,6 +180,7 @@ async function analyse() {
     });
     if (response.ok) showResult(text, await response.json());
     else if (response.status === 422) showError("اكتب نصاً فيه حروف عربية أو إيموجي، غير الروابط والإشارات إلى المستخدمين.");
+    else if (response.status === 429) showError("طلبات كثيرة في وقت قصير. انتظر دقيقة، ثم حاول مرة أخرى.");
     else showError("حدث خطأ في الخادم. حاول مرة أخرى.");
   } catch {
     showError("تعذّر الوصول إلى الخادم. تأكد أنه يعمل، ثم حاول مرة أخرى.");

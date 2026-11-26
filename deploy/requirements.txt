@@ -1,0 +1,6 @@
+# What the live demo needs to serve the model; training needs the root requirements.txt.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.9.1+cpu
+transformers==5.8.1
+fastapi==0.136.1
+uvicorn==0.47.0

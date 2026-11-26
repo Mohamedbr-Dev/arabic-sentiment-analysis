@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Browser demo check</title>
+<style>body { font: 15px/1.6 system-ui, sans-serif; margin: 24px; } pre { white-space: pre-wrap; }</style>
+</head>
+<body>
+<h1>Browser demo check</h1>
+<p>Compares the browser's cleaning, tokenizer and model with Python's (fixtures.json).</p>
+<pre id="log">running…</pre>
+<script type="module">
+import { cleanText, hasArabicOrEmoji } from "./text_clean.js";
+import { loadModel, classify } from "./model.js";
+
+const log = document.getElementById("log");
+const lines = [];
+const say = line => { lines.push(line); log.textContent = lines.join("\n"); };
+const report = { done: false };
+window.checkReport = report;
+
+const fixtures = await (await fetch("fixtures.json")).json();
+
+// 1. Cleaning
+const cleanMiss = fixtures.cleaning.filter(c => cleanText(c.text) !== c.clean || hasArabicOrEmoji(c.text) !== c.has);
+report.cleaning = { total: fixtures.cleaning.length, mismatches: cleanMiss.length,
+  examples: cleanMiss.slice(0, 10).map(c => ({ text: c.text, python: c.clean, js: cleanText(c.text),
+                                              hasPython: c.has, hasJs: hasArabicOrEmoji(c.text) })) };
+say(`cleaning: ${cleanMiss.length} of ${fixtures.cleaning.length} differ`);
+
+// 2. Tokenizer
+const { tokenizer, model } = await loadModel("model");
+const tokMiss = fixtures.tokens.filter(t => {
+  const ids = Array.from(tokenizer(t.clean).input_ids.data, Number);
+  return ids.length !== t.ids.length || ids.some((v, i) => v !== t.ids[i]);
+});
+report.tokens = { total: fixtures.tokens.length, mismatches: tokMiss.length,
+                  examples: tokMiss.slice(0, 5).map(t => t.clean) };
+say(`tokenizer: ${tokMiss.length} of ${fixtures.tokens.length} differ`);
+
+// 3. Model
+let worst = 0, labelMiss = 0;
+for (const m of fixtures.model) {
+  const r = await classify(tokenizer, model, m.clean);
+  const p = [r.probabilities.negative, r.probabilities.neutral, r.probabilities.positive];
+  worst = Math.max(worst, ...p.map((v, i) => Math.abs(v - m.probs[i])));
+  if (p.indexOf(Math.max(...p)) !== m.probs.indexOf(Math.max(...m.probs))) labelMiss++;
+}
+report.model = { total: fixtures.model.length, labelMismatches: labelMiss, worstProbabilityGap: worst };
+say(`model: ${labelMiss} of ${fixtures.model.length} labels differ; largest probability gap ${worst.toFixed(5)}`);
+
+// 4. Accuracy of the browser model on whole labelled sets
+report.accuracy = {};
+for (const [name, rows] of Object.entries(fixtures.sets)) {
+  let right = 0;
+  for (const row of rows) right += (await classify(tokenizer, model, row.clean)).sentiment === row.label;
+  report.accuracy[name] = right / rows.length;
+  say(`accuracy on ${name}: ${(right / rows.length).toFixed(3)} (n=${rows.length})`);
+}
+report.done = true;
+say("done");
+</script>
+</body>
+</html>

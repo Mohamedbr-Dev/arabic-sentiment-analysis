@@ -23,9 +23,14 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from .rate_limit import RateLimiter
 from .text_clean import clean_text, has_arabic_or_emoji
 
 MAX_CHARS = 2000
+
+# Requests to /predict per minute; 0 is no limit. Set these when the server is public.
+_limiter = RateLimiter(per_client=int(os.environ.get("RATE_LIMIT_PER_CLIENT", 0)),
+                       total=int(os.environ.get("RATE_LIMIT_TOTAL", 0)))
 
 # Below this the model was right only 58% of the time on the validation set.
 MIN_CONFIDENCE = 0.6
@@ -47,7 +52,9 @@ def _load_model(model_dir: str):
         )
 
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model     = AutoModelForSequenceClassification.from_pretrained(model_dir).to(_DEVICE)
+    # float32 even when the weights are stored in float16: half precision is slow on CPUs
+    model     = AutoModelForSequenceClassification.from_pretrained(
+        model_dir, dtype=torch.float32).to(_DEVICE)
     model.eval()
 
     with open(os.path.join(model_dir, "project_config.json"), encoding="utf-8") as f:
@@ -106,8 +113,19 @@ def health():
     return {"status": "ok", "device": str(_DEVICE)}
 
 
-@app.post("/predict", response_model=PredictResponse)
-def predict(request: PredictRequest):
+def _client_address(http: Request) -> str:
+    """Behind a proxy, the last X-Forwarded-For entry is the one the proxy added."""
+    forwarded = http.headers.get("x-forwarded-for", "")
+    if forwarded.strip():
+        return forwarded.split(",")[-1].strip()
+    return http.client.host if http.client else ""
+
+
+@app.post("/predict", response_model=PredictResponse,
+          responses={429: {"description": "too many requests; try again in a minute"}})
+def predict(request: PredictRequest, http: Request):
+    if not _limiter.allow(_client_address(http)):
+        raise HTTPException(status_code=429, detail="too many requests; try again in a minute")
     if not has_arabic_or_emoji(request.text):
         raise HTTPException(status_code=422, detail="text must contain Arabic or emoji")
 

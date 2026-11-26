@@ -43,7 +43,8 @@ UNSEEN_FILES = {
 def load_predictor(model_dir: str, max_len: int = 64):
     """A function from cleaned texts to an array of class probabilities."""
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
-    model = AutoModelForSequenceClassification.from_pretrained(model_dir).to(DEVICE).eval()
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_dir, dtype=torch.float32).to(DEVICE).eval()   # as the API runs it
 
     def predict(texts: list) -> np.ndarray:
         probs = np.zeros((len(texts), len(LABELS)))
